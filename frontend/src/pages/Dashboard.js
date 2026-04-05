@@ -29,6 +29,7 @@ export default function Dashboard() {
   const headers = { Authorization: `Bearer ${token}` };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!token) { navigate('/'); return; }
     // Handle post-payment redirect
