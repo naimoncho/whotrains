@@ -31,6 +31,7 @@ def create_checkout(
         )
         return {"checkout_url": session.url}
     except Exception as e:
+        print(f"STRIPE ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
  
 @router.post("/webhook")
