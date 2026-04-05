@@ -28,6 +28,7 @@ export default function Dashboard() {
   const token  = localStorage.getItem('wt_token');
   const headers = { Authorization: `Bearer ${token}` };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!token) { navigate('/'); return; }
     // Handle post-payment redirect
