@@ -4,7 +4,7 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './Dashboard.css';
 
-const API = 'http://localhost:8000';
+const API = 'https://whotrains-production.up.railway.app';
 
 const ZONE_COLORS = {
   'Z5 - Máximo':       '#ff4757',

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Landing.css';
  
-const API = 'http://localhost:8000';
+const API = 'https://whotrains-production.up.railway.app';
  
 export default function Landing() {
   const navigate = useNavigate();
