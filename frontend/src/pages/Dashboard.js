@@ -4,7 +4,7 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './Dashboard.css';
 
-const API = 'https://whotrains-production.up.railway.app';
+const API = 'http://localhost:8000';
 
 const ZONE_COLORS = {
   'Z5 - Máximo':       '#ff4757',
@@ -29,7 +29,6 @@ export default function Dashboard() {
   const headers = { Authorization: `Bearer ${token}` };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!token) { navigate('/'); return; }
     // Handle post-payment redirect
@@ -42,18 +41,25 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [userRes, actRes, statsRes] = await Promise.all([
+      // Load user + activities first
+      const [userRes, actRes] = await Promise.all([
         axios.get(`${API}/me`, { headers }),
         axios.get(`${API}/activities?days=14`, { headers }),
-        axios.get(`${API}/stats`, { headers }),
       ]);
       setUser(userRes.data);
       setActivities(actRes.data);
-      setStats(statsRes.data);
+      setLoading(false);
+
+      // Load stats after (avoid Strava rate limit)
+      try {
+        const statsRes = await axios.get(`${API}/stats`, { headers });
+        setStats(statsRes.data);
+      } catch {
+        // Stats fail silently — not critical
+      }
     } catch {
       localStorage.removeItem('wt_token');
       navigate('/');
-    } finally {
       setLoading(false);
     }
   };
@@ -95,15 +101,29 @@ export default function Dashboard() {
   const runs   = activities.filter(a => a.type === 'Run');
   const totalKm = runs.reduce((s, a) => s + a.distance_km, 0).toFixed(1);
 
-  const zoneCounts = {};
-  runs.forEach(a => {
-    zoneCounts[a.zona] = (zoneCounts[a.zona] || 0) + a.distance_km;
-  });
-  const zoneData = Object.entries(zoneCounts).map(([name, km]) => ({
-    name:  name.split(' - ')[0],
-    km:    parseFloat(km.toFixed(1)),
-    color: ZONE_COLORS[name] || '#444'
-  }));
+  // Zone data from stats (all year) or fallback to local activities
+  const ZONE_ORDER = [
+    'Z1 - Recuperación',
+    'Z2 - Aeróbico Base',
+    'Z3 - Tempo',
+    'Z4 - Umbral',
+    'Z5 - Máximo',
+    'Sin FC',
+  ];
+  const zoneSource = stats?.zone_distribution || {};
+  const zoneCounts = Object.keys(zoneSource).length > 0
+    ? zoneSource
+    : activities.reduce((acc, a) => {
+        if (a.distance_km > 0) acc[a.zona] = (acc[a.zona] || 0) + a.distance_km;
+        return acc;
+      }, {});
+  const zoneData = ZONE_ORDER
+    .filter(name => zoneCounts[name] > 0)
+    .map(name => ({
+      name:  name.split(' - ')[0],
+      km:    parseFloat(Number(zoneCounts[name]).toFixed(1)),
+      color: ZONE_COLORS[name] || '#444'
+    }));
 
   return (
     <div className="dashboard">
@@ -165,7 +185,11 @@ export default function Dashboard() {
             <div className="activities-list">
               {activities.length === 0 && <p className="empty">No activities found.</p>}
               {activities.map(a => (
-                <div className="activity-card" key={a.id}>
+                <a
+                  className="activity-card"
+                  key={a.id}
+                  href={`/activity/${a.id}`}
+                >
                   <div className="activity-left">
                     <span className="activity-emoji">
                       {a.type === 'Run' ? '🏃' : a.type === 'Ride' ? '🚴' : a.type === 'Swim' ? '🏊' : '🏋️'}
@@ -182,7 +206,7 @@ export default function Dashboard() {
                       {a.zona}
                     </span>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           </div>
@@ -192,33 +216,83 @@ export default function Dashboard() {
           <div className="tab-content">
             <div className="tab-header">
               <h2>YOUR STATS</h2>
-              <span className="total-km">Last 365 days</span>
+              <span className="total-km">All time</span>
             </div>
+
+            <h3 className="stats-section-title">🏃 Running</h3>
             <div className="stats-grid">
               <div className="stat-card">
                 <span className="stat-value">{stats.total_runs}</span>
-                <span className="stat-label">Runs</span>
+                <span className="stat-label">Carreras</span>
               </div>
               <div className="stat-card">
                 <span className="stat-value">{stats.total_km_running}</span>
-                <span className="stat-label">km running</span>
+                <span className="stat-label">km</span>
               </div>
               <div className="stat-card">
+                <span className="stat-value">{stats.total_hours_running}h</span>
+                <span className="stat-label">Horas</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.total_elevation_running}m</span>
+                <span className="stat-label">Desnivel</span>
+              </div>
+            </div>
+
+            <h3 className="stats-section-title">🚴 Ciclismo</h3>
+            <div className="stats-grid">
+              <div className="stat-card">
                 <span className="stat-value">{stats.total_rides}</span>
-                <span className="stat-label">Rides</span>
+                <span className="stat-label">Salidas</span>
               </div>
               <div className="stat-card">
                 <span className="stat-value">{stats.total_km_riding}</span>
-                <span className="stat-label">km cycling</span>
+                <span className="stat-label">km</span>
               </div>
               <div className="stat-card">
-                <span className="stat-value">{stats.total_gym}</span>
-                <span className="stat-label">Gym sessions</span>
+                <span className="stat-value">{stats.total_hours_riding}h</span>
+                <span className="stat-label">Horas</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{stats.total_elevation_riding}m</span>
+                <span className="stat-label">Desnivel</span>
               </div>
             </div>
+
+            {stats.total_gym > 0 && (
+              <>
+                <h3 className="stats-section-title">🏋️ Gimnasio <span className="stats-note">(último año)</span></h3>
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <span className="stat-value">{stats.total_gym}</span>
+                    <span className="stat-label">Sesiones</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-value">{stats.total_hours_gym}h</span>
+                    <span className="stat-label">Horas</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {stats.total_swims > 0 && (
+              <>
+                <h3 className="stats-section-title">🏊 Natación</h3>
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <span className="stat-value">{stats.total_swims}</span>
+                    <span className="stat-label">Sesiones</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-value">{stats.total_km_swimming}</span>
+                    <span className="stat-label">km</span>
+                  </div>
+                </div>
+              </>
+            )}
             {zoneData.length > 0 && (
               <div className="chart-section">
-                <h3>ZONE DISTRIBUTION (14 days)</h3>
+                <h3>ZONE DISTRIBUTION (last 365 days)</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={zoneData} barSize={32}>
                     <XAxis dataKey="name" stroke="#444" tick={{ fill: '#999', fontSize: 12 }} />

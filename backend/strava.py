@@ -101,6 +101,172 @@ def procesar_actividades(activities: list, fc_max: int) -> list:
         })
     return resultado
  
+def fetch_athlete_stats(access_token: str, athlete_id: str) -> dict:
+    """Fetch all-time athlete stats from Strava (1 request, no pagination)"""
+    url = f"https://www.strava.com/api/v3/athletes/{athlete_id}/stats"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.get(url, headers=headers, timeout=15)
+    res.raise_for_status()
+    data = res.json()
+
+    def extract(totals):
+        return {
+            "count": totals.get("count", 0),
+            "distance_km": round(totals.get("distance", 0) / 1000, 1),
+            "moving_time_h": round(totals.get("moving_time", 0) / 3600, 1),
+            "elevation_m": round(totals.get("elevation_gain", 0), 0),
+        }
+
+    return {
+        "runs": extract(data.get("all_run_totals", {})),
+        "rides": extract(data.get("all_ride_totals", {})),
+        "swims": extract(data.get("all_swim_totals", {})),
+    }
+
+def fetch_activity_detail(access_token: str, activity_id: int) -> dict:
+    """Fetch full activity detail from Strava API"""
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.get(url, headers=headers, timeout=15)
+    res.raise_for_status()
+    return res.json()
+
+def fetch_activity_streams(access_token: str, activity_id: int) -> dict:
+    """Fetch HR, distance, time, altitude streams for an activity"""
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}/streams"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.get(url, headers=headers, params={
+        "keys": "heartrate,distance,time,altitude,latlng",
+        "key_type": "time"
+    }, timeout=15)
+    res.raise_for_status()
+    streams = {}
+    for s in res.json():
+        streams[s["type"]] = s["data"]
+    return streams
+
+def fetch_activity_laps(access_token: str, activity_id: int) -> list:
+    """Fetch laps/splits for an activity"""
+    url = f"https://www.strava.com/api/v3/activities/{activity_id}/laps"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    res = requests.get(url, headers=headers, timeout=15)
+    res.raise_for_status()
+    return res.json()
+
+def procesar_detalle(detail: dict, streams: dict, laps: list, fc_max: int) -> dict:
+    """Process all activity data into a structured response"""
+    fc = int(detail.get("average_heartrate") or 0)
+    max_fc = int(detail.get("max_heartrate") or 0)
+    activity_type = detail.get("type", "Run")
+
+    # Process laps/splits
+    splits = []
+    for lap in laps:
+        lap_fc = int(lap.get("average_heartrate") or 0)
+        splits.append({
+            "distance_km": round(lap.get("distance", 0) / 1000, 2),
+            "elapsed_time": lap.get("elapsed_time", 0),
+            "moving_time": lap.get("moving_time", 0),
+            "pace": formatear_ritmo(lap.get("average_speed", 0), activity_type),
+            "fc": lap_fc,
+            "zona": clasificar_zona(lap_fc, fc_max),
+            "elevation_gain": round(lap.get("total_elevation_gain", 0), 1),
+        })
+
+    # Downsample HR stream for chart (max ~200 points)
+    hr_chart = []
+    hr_data = streams.get("heartrate", [])
+    time_data = streams.get("time", [])
+    if hr_data and time_data:
+        step = max(1, len(hr_data) // 200)
+        for i in range(0, len(hr_data), step):
+            hr_chart.append({
+                "time_sec": time_data[i],
+                "hr": hr_data[i],
+                "zona": clasificar_zona(hr_data[i], fc_max),
+            })
+
+    # Downsample altitude stream
+    alt_chart = []
+    alt_data = streams.get("altitude", [])
+    dist_data = streams.get("distance", [])
+    if alt_data and dist_data:
+        step = max(1, len(alt_data) // 200)
+        for i in range(0, len(alt_data), step):
+            alt_chart.append({
+                "distance_km": round(dist_data[i] / 1000, 2),
+                "altitude": round(alt_data[i], 1),
+            })
+
+    # Route coordinates
+    route = []
+    latlng_data = streams.get("latlng", [])
+    if latlng_data:
+        step = max(1, len(latlng_data) // 300)
+        for i in range(0, len(latlng_data), step):
+            route.append(latlng_data[i])
+
+    # Calculate load (TRIMP)
+    fc_pct = round(fc / fc_max * 100, 1) if fc > 0 else 0
+    duration_min = round(detail.get("moving_time", 0) / 60, 1)
+    if fc_pct > 0:
+        load = round(duration_min * (fc_pct / 100) ** 1.92)
+    else:
+        base = {"Run": 0.8, "Ride": 0.5, "Swim": 0.9, "WeightTraining": 0.4}.get(activity_type, 0.3)
+        load = round(duration_min * base)
+
+    result = {
+        "id": detail["id"],
+        "name": detail.get("name", ""),
+        "type": activity_type,
+        "date": detail.get("start_date_local", "")[:10],
+        "start_time": detail.get("start_date_local", "")[11:16],
+        "distance_km": round(detail.get("distance", 0) / 1000, 2),
+        "pace": formatear_ritmo(detail.get("average_speed", 0), activity_type),
+        "max_speed_pace": formatear_ritmo(detail.get("max_speed", 0), activity_type),
+        "fc": fc,
+        "fc_max": max_fc,
+        "fc_pct": fc_pct,
+        "zona": clasificar_zona(fc, fc_max),
+        "duration_min": duration_min,
+        "elapsed_min": round(detail.get("elapsed_time", 0) / 60, 1),
+        "elevation_gain": round(detail.get("total_elevation_gain", 0), 1),
+        "calories": detail.get("calories", 0),
+        "load": load,
+        "splits": splits,
+        "hr_chart": hr_chart,
+        "alt_chart": alt_chart,
+        "route": route,
+        "description": detail.get("description", ""),
+    }
+
+    # Cycling-specific
+    if activity_type == "Ride":
+        result["avg_speed_kmh"] = round(detail.get("average_speed", 0) * 3.6, 1)
+        result["max_speed_kmh"] = round(detail.get("max_speed", 0) * 3.6, 1)
+        result["avg_watts"] = detail.get("average_watts", 0)
+        result["max_watts"] = detail.get("max_watts", 0)
+        result["weighted_avg_watts"] = detail.get("weighted_average_watts", 0)
+        result["kilojoules"] = detail.get("kilojoules", 0)
+
+    # Swim-specific
+    if activity_type == "Swim":
+        dist_m = detail.get("distance", 0)
+        moving_sec = detail.get("moving_time", 0)
+        if dist_m > 0 and moving_sec > 0:
+            pace_100m_sec = (moving_sec / dist_m) * 100
+            m = int(pace_100m_sec // 60)
+            s = int(pace_100m_sec % 60)
+            result["pace_100m"] = f"{m}:{s:02d} /100m"
+        else:
+            result["pace_100m"] = "—"
+        result["pool_length"] = detail.get("pool_length", 0)
+        result["avg_strokes"] = detail.get("average_cadence", 0)
+        result["total_strokes"] = int(detail.get("average_cadence", 0) * moving_sec / 60) if detail.get("average_cadence") else 0
+
+    return result
+
+
 def construir_prompt(activities: list, user) -> str:
     lineas = [
         f"ATLETA: FC MÁX {user.fc_max} bpm",

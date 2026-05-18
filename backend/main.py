@@ -59,6 +59,7 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
             access_token     = data["access_token"],
             refresh_token    = data["refresh_token"],
             token_expires_at = data["expires_at"],
+            is_pro           = True,
         )
         db.add(user)
     else:
@@ -127,9 +128,34 @@ def get_activities(
         raise HTTPException(status_code=500, detail=f"Error al obtener actividades: {e}")
  
     return strava.procesar_actividades(raw, current_user.fc_max)
- 
+
+# --- DETALLE DE ACTIVIDAD ---
+
+@app.get("/activity/{activity_id}")
+def get_activity_detail(
+    activity_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    token, new_refresh, new_expires = strava.get_valid_token(current_user)
+
+    if token != current_user.access_token:
+        current_user.access_token     = token
+        current_user.refresh_token    = new_refresh
+        current_user.token_expires_at = new_expires
+        db.commit()
+
+    try:
+        detail = strava.fetch_activity_detail(token, activity_id)
+        streams = strava.fetch_activity_streams(token, activity_id)
+        laps = strava.fetch_activity_laps(token, activity_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener actividad: {e}")
+
+    return strava.procesar_detalle(detail, streams, laps, current_user.fc_max)
+
 # --- ESTADÍSTICAS ---
- 
+
 @app.get("/stats")
 def get_stats(
     current_user: models.User = Depends(get_current_user),
@@ -143,19 +169,43 @@ def get_stats(
         current_user.token_expires_at = new_expires
         db.commit()
  
-    raw = strava.fetch_activities(token, days=365)
-    activities = strava.procesar_actividades(raw, current_user.fc_max)
- 
-    runs   = [a for a in activities if a["type"] == "Run"]
-    rides  = [a for a in activities if a["type"] == "Ride"]
-    gyms   = [a for a in activities if a["type"] == "WeightTraining"]
- 
+    # All-time stats from Strava (single API call, no pagination)
+    all_time = strava.fetch_athlete_stats(token, current_user.strava_id)
+
+    # Fetch last year activities for gym count + zone distribution
+    gym_count = 0
+    gym_hours = 0
+    zone_distribution = {}
+    try:
+        raw = strava.fetch_activities(token, days=365)
+        activities = strava.procesar_actividades(raw, current_user.fc_max)
+        gyms = [a for a in raw if a.get("type") == "WeightTraining"]
+        gym_count = len(gyms)
+        gym_hours = round(sum(a.get("moving_time", 0) for a in gyms) / 3600, 1)
+
+        # Zone distribution (all activities with distance)
+        for a in activities:
+            if a["distance_km"] > 0:
+                zone_distribution[a["zona"]] = round(
+                    zone_distribution.get(a["zona"], 0) + a["distance_km"], 1
+                )
+    except Exception:
+        pass
+
     return {
-        "total_runs":       len(runs),
-        "total_km_running": round(sum(a["distance_km"] for a in runs), 1),
-        "total_rides":      len(rides),
-        "total_km_riding":  round(sum(a["distance_km"] for a in rides), 1),
-        "total_gym":        len(gyms),
+        "total_runs":        all_time["runs"]["count"],
+        "total_km_running":  all_time["runs"]["distance_km"],
+        "total_hours_running": all_time["runs"]["moving_time_h"],
+        "total_elevation_running": all_time["runs"]["elevation_m"],
+        "total_rides":       all_time["rides"]["count"],
+        "total_km_riding":   all_time["rides"]["distance_km"],
+        "total_hours_riding": all_time["rides"]["moving_time_h"],
+        "total_elevation_riding": all_time["rides"]["elevation_m"],
+        "total_swims":       all_time["swims"]["count"],
+        "total_km_swimming": all_time["swims"]["distance_km"],
+        "total_gym":         gym_count,
+        "total_hours_gym":   gym_hours,
+        "zone_distribution": zone_distribution,
     }
  
 # --- ANÁLISIS (solo PRO) ---

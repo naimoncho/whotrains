@@ -1,0 +1,277 @@
+.ad-loading {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--muted);
+}
+
+.ad-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+}
+
+/* Top bar */
+.ad-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.ad-back-btn {
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.ad-back-btn:hover {
+  color: var(--white);
+}
+
+.ad-strava-link {
+  font-size: 0.8rem;
+  color: #fc4c02;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.ad-strava-link:hover {
+  opacity: 0.7;
+}
+
+/* Header */
+.ad-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #222;
+}
+
+.ad-header-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ad-emoji {
+  font-size: 2rem;
+}
+
+.ad-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.ad-subtitle {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ad-zone-badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #000;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Stats grid */
+.ad-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.ad-stat {
+  background: var(--gray);
+  border: 1px solid #222;
+  border-radius: 10px;
+  padding: 1.2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ad-stat-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--white);
+}
+
+.ad-stat-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Chart sections */
+.ad-chart-section {
+  background: var(--gray);
+  border: 1px solid #222;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ad-chart-section h3 {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+}
+
+/* Splits table */
+.ad-splits-table {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.ad-splits-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 60px 50px 80px;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #333;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ad-splits-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 60px 50px 80px;
+  gap: 0.5rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: 0.82rem;
+  align-items: center;
+}
+
+.ad-splits-row:hover {
+  background: #1a1a1a;
+}
+
+.ad-split-num {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ad-split-pace {
+  font-weight: 500;
+}
+
+.ad-splits-chart {
+  margin-top: 1rem;
+}
+
+/* Route map (SVG) */
+.ad-map {
+  width: 100%;
+  height: 300px;
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-route-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Ride splits (5 cols) */
+.ad-splits-header--ride,
+.ad-splits-row--ride {
+  grid-template-columns: 40px 1fr 1fr 60px 80px;
+}
+
+/* Swim splits (4 cols) */
+.ad-splits-header--swim,
+.ad-splits-row--swim {
+  grid-template-columns: 40px 1fr 1fr 60px;
+}
+
+/* Gym effort summary */
+.ad-effort-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ad-effort-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ad-effort-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  width: 28px;
+  text-align: right;
+}
+
+.ad-effort-track {
+  flex: 1;
+  height: 22px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ad-effort-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.ad-effort-pct {
+  font-size: 0.78rem;
+  color: var(--muted);
+  width: 36px;
+  text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ad-page {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .ad-title {
+    font-size: 1.3rem;
+  }
+
+  .ad-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ad-splits-header,
+  .ad-splits-row {
+    grid-template-columns: 30px 1fr 1fr 50px 40px;
+    font-size: 0.75rem;
+  }
+
+  .ad-splits-header span:last-child,
+  .ad-splits-row span:last-child {
+    display: none;
+  }
+}
